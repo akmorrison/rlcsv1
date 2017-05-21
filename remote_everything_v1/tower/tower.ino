@@ -1,4 +1,4 @@
-#define DEBUG
+//#define DEBUG
 
 
 #define RLAY_IGN_ARM 12
@@ -28,6 +28,13 @@ byte state_canon[] = {0,0,0,0,0,0,0,0,0};
 byte state_received[] = {0,0,0,0,0,0,0,0,0};
 int state_received_index = 0;
 
+#define DAQ_MASS_SENSOR A0
+#define DAQ_PRESSURE_SENSOR A1
+#define WINDOW_SIZE 20
+int DAQ_MASS_HISTORY[WINDOW_SIZE];
+int DAQ_PRESSURE_HISTORY[WINDOW_SIZE];
+int DAQ_HISTORY_INDEX = 0;
+
 void setup(){
     Serial.begin(9600);
     #ifdef DEBUG
@@ -41,7 +48,7 @@ void setup(){
 
 byte c;
 void loop(){
-    if(Serial.available() > 0){
+    while(Serial.available() > 0){
         c = Serial.read();
         #ifdef DEBUG
         Serial.write(c);
@@ -60,6 +67,11 @@ void loop(){
         }
     }
     delay(100);
+    //read DAQ values
+    DAQ_MASS_HISTORY[DAQ_HISTORY_INDEX] = analogRead(DAQ_MASS_SENSOR);
+    DAQ_PRESSURE_HISTORY[DAQ_HISTORY_INDEX] = analogRead(DAQ_PRESSURE_SENSOR);
+    if(++DAQ_HISTORY_INDEX >= WINDOW_SIZE)
+        DAQ_HISTORY_INDEX = 0;
 }
 
 void send_status_report(){
@@ -70,6 +82,25 @@ void send_status_report(){
     #endif
     for(int i = 0; i < TOTAL_RLAYS; i++)
         Serial.write(state_canon[i] + '0');
+
+    //report the daq readings
+    int pressure = analogRead(DAQ_PRESSURE_SENSOR);
+    int mass = analogRead(DAQ_MASS_SENSOR);
+   
+    #ifdef DEBUG
+    Serial.print("Pressure: ");
+    #else
+    Serial.write('P');
+    #endif
+    serial_write_pressure_reading();
+
+    #ifdef DEBUG
+    Serial.print("Mass: ");
+    #else
+    Serial.write('M');
+    #endif
+    serial_write_mass_reading();
+
     #ifdef DEBUG
     Serial.write('\n');
     Serial.write('\r');
@@ -98,5 +129,46 @@ void send_ack_and_write(){
         Serial.write('\n');
         Serial.write('\r');
         #endif
+    }
+}
+
+#define DAQ_READING_LENGTH 4
+int serial_write_pressure_reading(){
+    long accumulator = 0;
+    for(int i = 0; i < WINDOW_SIZE; i++)
+        accumulator += DAQ_PRESSURE_HISTORY[i];
+    accumulator /= WINDOW_SIZE;
+
+    //the math for pressure sensor is said to be
+    //P1 = Vin*610.55, +46.965
+    accumulator *= 611 * 5;
+    accumulator >>= 10;
+    accumulator += 47;
+
+    Serial.print((accumulator / 1000)% 10); //print the 4th digit
+    Serial.print((accumulator / 100) % 10);
+    Serial.print((accumulator / 10 ) % 10);
+    Serial.print(accumulator % 10); //print the first digit
+}
+
+int serial_write_mass_reading(){
+    long accumulator = 0;
+    for(int i = 0; i < WINDOW_SIZE; i++)
+        accumulator += DAQ_MASS_HISTORY[i];
+    accumulator /= WINDOW_SIZE;
+
+    //The math for load cell is said to be
+    //LC = Vin*25.0, -12.734
+    accumulator *= 25 * 5;
+    accumulator >>= 10;
+    accumulator -= 12;
+
+    if(accumulator < 0 || accumulator > 100)
+        Serial.print("ERR");
+    else{
+        Serial.print((accumulator / 1000)% 10); //print the 4th digit
+        Serial.print((accumulator / 100) % 10);
+        Serial.print((accumulator / 10 ) % 10);
+        Serial.print(accumulator % 10); //print the first digit
     }
 }
