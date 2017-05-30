@@ -1,0 +1,35 @@
+Tower Side Arduino High Level Pseudocode, Last updated May 28th
+
+Loop function:
+    Get readings from both DAQ sensors, update the sliding window filter
+    If there's a message from the client:
+        Update `global_time_last_contact`
+        If it's an ACK:
+            if there's a previously stored value `global_last_state_command`:
+                update `global_tower_state`
+                update the relays
+            else:
+                Tower has sent an ACK without us requesting an ACK.
+                This is weird. I don't know what to do here, so do nothing
+        If it's a state command:
+            update `global_last_state_command`
+            send an ACK request to the client
+            update `global_time_last_ACK_request`
+        If it's a status request:
+            send `global_tower_state`
+            send window filtered average of DAQ pressure readings
+            send window filtered average of DAQ mass readings
+
+    If `global_tower_state` != `global_last_state_command` and `global_time_last_ACK_request` was more than `TIME_BETWEEN_ACK_REQUESTS` ago:
+        send another ACK request
+    If it's been longer than `TIME_LOST_CONTACT_IGNITION_SHUTOFF` since `global_time_last_contact`:
+        turn off the ignition relays
+        update `global_tower_state`
+    If it's been longer than `TIME_LOST_CONTACT_TOTAL_SHUTOFF` since `global_time_last_contact`:
+        go to a safe state (valves in safest position, ignition off) (have to ask Yash what the safest positions are)
+        update `global_tower_state`
+
+constants:
+    `TIME_BETWEEN_ACK_REQUESTS`: 500mS
+    `TIME_LOST_CONTACT_IGNITION_SHUTOFF`: 3 seconds
+    `TIME_LOST_CONTACT_TOTAL_SHUTOFF`: 10 seconds

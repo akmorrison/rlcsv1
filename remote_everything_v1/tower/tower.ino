@@ -1,9 +1,9 @@
 //#define DEBUG
 
 
-#define RLAY_IGN_ARM 12
-#define RLAY_IGN_PRI 11
-#define RLAY_IGN_SEC 10
+#define RLAY_IGN_ARM 10
+#define RLAY_IGN_PRI 9
+#define RLAY_IGN_SEC 8
 
 #define RLAY_RFILL_0 3
 #define RLAY_RFILL_1 6

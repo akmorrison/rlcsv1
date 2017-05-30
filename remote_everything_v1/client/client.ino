@@ -2,21 +2,21 @@
 
 #include<LiquidCrystal.h>
 
-#define BTN_IGN_ARM 12
-#define BTN_IGN_PRI 11
-#define BNT_IGN_SEC 10
+#define BTN_IGN_PRI 12
+#define BNT_IGN_SEC 11
 
-#define SWI_RFILL_0 5
-#define SWI_RFILL_1 6
-#define SWI_RFILL_2 7
-#define SWI_RFILL_3 4
-#define SWI_RFILL_4 3
-#define SWI_RFILL_5 2
+#define RFILL_VALVE_PWR 7
+#define RFILL_VALVE_DIR 4
+#define RVENT_VALVE_PWR 6
+#define RVENT_VALVE_DIR 3
+#define RDISCONNECT_PWR 5
+#define RDISCONNECT_DIR 2
 
-#define TOTAL_BTNS 9
-byte state_canon[] = {0,0,0,0,0,0,0,0,0}; //holds either 0 or 1. Not '0' or '1'
-byte state_temp[] = {0,0,0,0,0,0,0,0,0};
-int buttons[] = { BTN_IGN_ARM, BTN_IGN_PRI, BNT_IGN_SEC, SWI_RFILL_0, SWI_RFILL_1, SWI_RFILL_2, SWI_RFILL_3, SWI_RFILL_4, SWI_RFILL_5};
+#define TOTAL_BTNS 8
+byte state_canon[] = {0,0,0,0,0,0,0,0}; //holds either 0 or 1. Not '0' or '1'
+byte state_temp[] = {0,0,0,0,0,0,0,0};
+int buttons[] = {RFILL_VALVE_PWR, RFILL_VALVE_DIR, RVENT_VALVE_PWR, RVENT_VALVE_DIR, RDISCONNECT_PWR, RDISCONNECT_DIR};
+
 
 unsigned long time_since_last_status;
 #define MILLIS_BETWEEN_STATUS 1000
@@ -24,11 +24,11 @@ unsigned long time_since_last_status;
 //LCD stuff
 #define RS 8
 #define RW 9
-#define ENABLE 18
-#define D4 14 //Analog pin 1's digital analog
-#define D5 15
-#define D6 16
-#define D7 17
+#define ENABLE 58
+#define D4 54 //Analog pin 1's digital analog
+#define D5 55
+#define D6 56
+#define D7 57
 #define PRESSURE_LEADER "PRESSURE:"
 #define PRESSURE_START_POINT 9,0
 #define MASS_LEADER "GRAVITY:"
@@ -59,6 +59,7 @@ void loop(){
             send_update = 1;
     }
     if(send_update){
+        Serial.write('1');
         for(int i = 0; i < TOTAL_BTNS; i++)
             Serial.write(state_temp[i] + '0');
         #ifdef DEBUG
@@ -132,6 +133,8 @@ int rec_ack(){
         delay(10);
     if(getbyte() != 'A' || getbyte() != 'C' || getbyte() != 'K')
         return 0;
+    //do the one for arming switch
+    byte c = getbyte();
     for(int i = 0; i < TOTAL_BTNS; i++){
         byte c = getbyte();
         #ifdef DEBUG

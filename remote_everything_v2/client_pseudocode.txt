@@ -1,0 +1,33 @@
+Client Side Arduino High level Pseudocode, Last updated May 28th
+
+Loop function:
+    poll all buttons, store result in `global_button_state`
+    if there's a messge from the tower:
+        if the message is a status update:
+            copy tower state to `global_tower_state`
+            update `global_time_since_last_update`
+        if the message is a daq pressure update:
+            copy daq pressure to `global_tower_pressure`
+        if the message is a daq mass update:
+            copy daq mass to `global_tower_mass`
+        if the message is an ACK request:
+            if the state sent with the request matches button state:
+                send back an ACK
+            if doesn't match, or state isn't sent after the ack within `ACK_TIMEOUT`:
+                send back a NACK
+    if `global_tower_state` doesn't match `global_button_state`:
+        send `global_button_state` to the tower
+    if it's been longer than `TIME_BETWEEN_STATUS_REQUESTS` since tower last sent a status:
+        request status from tower
+    Update what's on the LCD:
+        if it's been longer than `CONNECTION_LOST_TIME` since last status was sent from the tower:
+            display "Signal lost, last known connection X seconds ago"
+        else if `global_tower_state` does not match `global_button_state`
+            display "Sending update to tower"
+        else, which means we know we're good:
+            display `global_tower_pressure` and `global_tower_mass`
+
+constants:
+    `ACK_TIMEOUT`: probably about 500mS
+    `TIME_BETWEEN_STATUS_REQUESTS`: 1 second
+    `CONNECTION_LOST_TIME`: 5 seconds

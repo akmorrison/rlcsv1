@@ -1,0 +1,112 @@
+\documentclass{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{tikz}
+\usepackage{circuitikz}
+\begin{document}
+\pagenumbering{gobble}
+\tikzstyle{block} = [draw, rectangle, minimum height=3em, minimum width=5em]
+\begin{figure}[h!]
+\begin{tikzpicture}[auto, node distance=1in, >=latex']
+    \node[block] at (0,0) (CSRF) {Client Box};
+    \node[block] at (0,2.5) (CSIG) {Ignition Buttons};
+    \node[antenna, label={below:client xbee}] at (3,0) (CSXB) {};
+
+    \node[antenna, label={below:tower xbee}] at (6,0) (TSXB) {};
+    \node[block] at (9,0) (TSCT) {Tower Control Box};
+    \node[block] at (9,2) (TSRF) {Remote Fill Control};
+    \node[block] at (9,-2) (TSIG) {Ignition Box};
+
+    \node[block] at (15, 0) (DAQ) {Daq sensors};
+    \node[block] at (15, 2) (VLVS) {Remote Valves};
+    \node[block] at (15, -2) (IGN) {Igniters};
+
+    \draw[-] (CSRF.east)--(CSXB);
+    \draw[-] (CSRF.north)--(CSIG.south) node[midway, right] {4 pin cable};
+
+    \draw[-] (TSXB)--(TSCT.west);
+    \draw[-] (TSCT.north)--(TSRF.south) node[midway, right] {RJ45'd Cat5 cable};
+    \draw[-] (TSCT.south)--(TSIG.north) node[midway, right] {4pin'd Cat5 cable};
+
+    \draw[-] (TSIG.east)--(IGN) node[midway, below] {Ignition quick-attach};
+    \draw[-] (TSRF.east)--(VLVS) node[midway,above] {};
+    \draw[-] (TSCT.east)--(DAQ) node[midway, above] {Daq cables};
+\end{tikzpicture}
+\caption{High level block diagram}
+\end{figure}
+
+\begin{figure}[h!]
+\begin{tikzpicture}[]
+    \node[block, minimum height=3in, minimum width=5in] at (3,3) (BRDR) {};
+    \node[block, minimum height=1in, minimum width=3in] at (2.5,1.2) (BTRY) {Battery};
+    \node[block, minimum height=1in, minimum width=1.6in] at (1,4.5) (PWR) {Power board};
+    \node[block] at (-2.5,5) (FUSE) {Fuse};
+    \node[block, minimum height=1in, minimum width=1in] at (8,1.2) (XBEE) {Xbee};
+    \node[block, minimum height=1in, minimum width=1.5in] at (5.5,4.5) (ARD) {Arduino};
+
+    \node[block,minimum height=1in, minimum width=2in] at (6.5,8.5) (LCD) {LCD};
+
+
+    \draw[-] (ARD.east)-|(XBEE.north) node[midway, right] {UART};
+    \draw[-,double] (BTRY.west)-|(FUSE.south) node[midway, right] {12V};
+    \draw[-,double] (FUSE.east)--++(0.6,0) node[midway, above] {12V};
+    \draw[-,double] (PWR.east)--(ARD.west) node[midway, above] {5V};
+
+    \draw[-] (ARD.north)--([xshift=-0.4in]LCD.south);
+    \draw[-] ([xshift=0.1in]ARD.north)--([xshift=-0.3in]LCD.south);
+    \draw[-] ([xshift=0.2in]ARD.north)--([xshift=-0.2in]LCD.south);
+    \draw[-] ([xshift=0.3in]ARD.north)--([xshift=-0.1in]LCD.south);
+    \draw[-] ([xshift=0.4in]ARD.north)--(LCD.south);
+
+    \draw[-,thick] ([xshift=-0.7in]ARD.north)|-++(-1in,1in) node[left] {buncha (6) wires going to switches};
+
+    \draw[-] (ARD.south)|-(BRDR.west) node[midway,below] {going to ignition connector};
+\end{tikzpicture}
+\caption{The client side box}
+\end{figure}
+
+
+
+\begin{figure}[h!]
+\begin{tikzpicture}[]
+    \node[block, minimum height=4in, minimum width=5.5in] at (3,3) (BRDR) {};
+    \node[block, minimum height=2.5in, minimum width=1in] at (-.5,4.8) (BTRY) {Battery};
+    \node[block, minimum height=1in, minimum width=1.6in] at (3,5.5) (PWR) {Power board};
+    \node[block] at (-3,5) (FUSE) {Fuse};
+    \node[block] at (-3,3) (PWSW) {Switch};
+    \node[block, minimum height=1in, minimum width=1in] at (-2.5,0) (XBEE) {Xbee};
+    \node[block, minimum height=2in, minimum width=1.5in] at (2.8,1) (ARD) {Arduino};
+    \node[block, minimum height=3in, minimum width=1.7in] at(7.5,3) (RLAY) {Relay board};
+
+    \draw[-,double] ([yshift=-1.2in]BTRY.west)-|(PWSW.south);
+    \draw[-,double] (PWSW.north)--(FUSE.south);
+    \draw[-,double] (FUSE.north)|-([yshift=0.4in]PWR.west);
+    \draw[-,double] (PWR.south)--++(0,-0.7) node[midway, left] {5V};
+    \draw[-,double] (PWR.east)--++(0.4,0) node[right] {12V, for acutating ignition};
+
+    \draw[-] (XBEE.east)-|(ARD.west);
+    \node[label={above right:UART}] at (XBEE.east) {};
+
+    \draw[-] (ARD.east)--++(0.65,0) node[right] {9 wires for 9 relays};
+    \draw[-] ([yshift=-3]ARD.east)--++(0.65,0);
+    \draw[-] ([yshift=-6]ARD.east)--++(0.65,0);
+    \draw[-] ([yshift=-9]ARD.east)--++(0.65,0);
+    \draw[-] ([yshift=-12]ARD.east)--++(0.65,0);
+    \draw[-] ([yshift=-15]ARD.east)--++(0.65,0);
+    \draw[-] ([yshift=-18]ARD.east)--++(0.65,0);
+    \draw[-] ([yshift=-21]ARD.east)--++(0.65,0);
+    \draw[-] ([yshift=-24]ARD.east)--++(0.65,0);
+
+    \draw[-] ([yshift=60]RLAY.east)--++(1,0) node[right] {wires going to ignition,};
+    \draw[-] ([yshift=50]RLAY.east)--++(1,0) node[right] {pulled high to ignite rocket};
+
+    \draw[-] ([yshift=-50]RLAY.east)--++(1,0) node[right] {6 wires to remote fill};
+    \draw[-] ([yshift=-53]RLAY.east)--++(1,0);
+    \draw[-] ([yshift=-56]RLAY.east)--++(1,0);
+    \draw[-] ([yshift=-59]RLAY.east)--++(1,0);
+    \draw[-] ([yshift=-62]RLAY.east)--++(1,0);
+    \draw[-] ([yshift=-65]RLAY.east)--++(1,0) node[right] {shorted to RF\textsubscript{in} to actuate};
+\end{tikzpicture}
+\caption{The tower side box}
+\end{figure}
+\end{document}
