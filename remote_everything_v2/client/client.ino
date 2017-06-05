@@ -1,3 +1,4 @@
+//#define DEBUG_NETWORK
 #include<LiquidCrystal.h>
 
 #define BTN_IGN_PRI 12
@@ -13,10 +14,15 @@ byte global_tower_state = 0; //holds 0 to 255
 byte global_button_state[] = {0,0,0,0,0,0,0,0};
 int buttons[] = {BTN_IGN_PRI, BTN_IGN_SEC, RFILL_VALVE_PWR, RFILL_VALVE_DIR, RVENT_VALVE_PWR, RVENT_VALVE_DIR, RDISCONNECT_PWR, RDISCONNECT_DIR};
 
-unsigned long time_since_last_status;
-#define TIME_BETWEEN_STATUS_REQUESTS 1000
+long time_since_last_status; //when we last received a status
+long time_since_last_status_request; //when we last asked for a status
+#define TIME_BETWEEN_STATUS_REQUESTS 1000 //we received a status > 1000ms ago. We should ask for another one
+#define TIME_BETWEEN_STATUS_WRITES 500 //we asked for a status 100ms ago, and didn't get anything. We should ask again
 #define ACK_TIMEOUT 500
 #define CONNECTION_LOST_TIME 5000
+
+long time_last_command_sent = 0;
+#define MIN_TIME_BETWEEN_COMMANDS 100
 
 //LCD stuff
 #define RS 8
@@ -64,11 +70,15 @@ void loop(){
     }
 
     //if there's a message from the tower
-    if(Serial.available()){
+    while(Serial.available()){
         byte input = Serial.read();
+        #ifdef DEBUG_NETWORK
+        put_char_on_lcd(input);
+        #endif
         switch(input){
             case 'S': //tower is sending us a state update
                 global_expected_state = STATE;
+                time_since_last_status = millis();
                 data_in_index = 0;
                 break;
             case 'P': //tower is sending a pressure update
@@ -109,7 +119,7 @@ void loop(){
                         pressure_in[data_in_index++] = input;
                 }
                 else if(global_expected_state == MASS){
-                    if(data_in_index == 3){
+                    if(data_in_index == 2){
                         //last hexit of mass in
                         mass_in[data_in_index] = input;
                         update_mass_data(); //translate and store
@@ -138,19 +148,22 @@ void loop(){
 
 
     //if global_button_state doesn't match global_tower_state
-    if(global_tower_state != button_state_to_byte()){
+    if(global_tower_state != button_state_to_byte() && (millis()-time_last_command_sent) > MIN_TIME_BETWEEN_COMMANDS){
         //send a command to the tower
         send_button_state_to_tower();
     }
 
     //if it's been too long since we've gotten a status update
-    if((millis()-time_since_last_status) > TIME_BETWEEN_STATUS_REQUESTS){
+    if((millis()-time_since_last_status) > TIME_BETWEEN_STATUS_REQUESTS && (millis()-time_since_last_status_request) > TIME_BETWEEN_STATUS_WRITES){
         //request status update
-        Serial.write('S');
+        time_since_last_status_request = millis();
+        write_to_xbee('S');
     }
 
+    #ifndef DEBUG_NETWORK
     //update what's on the lcd
     update_lcd();
+    #endif
 }
 
 void update_tower_state() {
@@ -219,17 +232,20 @@ void check_ack_and_respond(){
 
     //we now have an acc byte. If it matches global_button_state, send 'K'
     //otherwise, send 'N'
-    if(button_state_to_byte() == state_acc)
-        Serial.write('A');
+    if(button_state_to_byte() == state_acc){
+        write_to_xbee('K');
+        //if we're acking, we should then immediately check if it's been applied
+        write_to_xbee('S');
+    }
     else
-        Serial.write('N');
+        write_to_xbee('N');
 }
 
 //translates global_button_state to tower
 void send_button_state_to_tower(){
     byte to_send = button_state_to_byte();
-    byte first_byte = (to_send & 0x11110000) >> 4;
-    byte second_byte= to_send & 0x00001111;
+    byte first_byte = (to_send & 0b11110000) >> 4;
+    byte second_byte= to_send & 0b00001111;
     //now we have a value, need to convert to ascii
     if(first_byte < 10) //it's a digit
         first_byte += '0';
@@ -246,9 +262,10 @@ void send_button_state_to_tower(){
     }
 
     //the 'U' flag means "this is an update"
-    Serial.write('U');
-    Serial.write(first_byte);
-    Serial.write(second_byte);
+    time_last_command_sent = millis();
+    write_to_xbee('U');
+    write_to_xbee(first_byte);
+    write_to_xbee(second_byte);
 }
 
 //converts what's in global_button_state to a single byte
@@ -271,8 +288,8 @@ enum{
     LCD_CONN_LOST
 } lcd_state;
 unsigned long seconds_conn_lost = 0;
-unsigned lcd_normal_counter = 0;
 //changes what's on the LCD
+unsigned long lcd_normal_counter = 0;
 void update_lcd(){
     //if it's been longer than CONECTION LOST TIME since last contact
     if((millis()-time_since_last_status)>CONNECTION_LOST_TIME){
@@ -306,7 +323,7 @@ void update_lcd(){
         lcd_normal_counter = 0;
         lcd.clear();
         //output pressure data
-        lcd.print("PRESSURE: ");
+        lcd.print("PRESSURE:");
         lcd.write(global_tower_pressure[0]);
         lcd.write(global_tower_pressure[1]);
         lcd.write(global_tower_pressure[2]);
@@ -316,11 +333,41 @@ void update_lcd(){
         lcd.setCursor(0,1);
         lcd.print("MASS: ");
         lcd.write(global_tower_mass[0]);
-        lcd.write(global_tower_mass[0]);
+        lcd.write(global_tower_mass[1]);
         lcd.write('.');
-        lcd.write(global_tower_mass[0]);
+        lcd.write(global_tower_mass[2]);
         lcd.print("LBS");
         lcd_state = LCD_NORMAL;
     }
 }
 
+#ifdef DEBUG_NETWORK
+int lcd_x = 0;
+void put_char_on_lcd(char in){
+    lcd_x++;
+    if(lcd_x >= 16){
+        lcd_x = 0;
+    }
+
+    lcd.setCursor(lcd_x,0);
+    lcd.write(in);
+}
+
+int lcd_out_x = 0;;
+void put_out_char_on_lcd(char in){
+    lcd_out_x++;
+    if(lcd_out_x >= 16){
+        lcd_out_x = 0;
+    }
+
+    lcd.setCursor(lcd_out_x,1);
+    lcd.write(in);
+}
+#endif
+
+void write_to_xbee(char out){
+    #ifdef DEBUG_NETWORK
+    put_out_char_on_lcd(out);
+    #endif
+    Serial.write(out);
+}
