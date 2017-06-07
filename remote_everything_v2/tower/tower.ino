@@ -346,10 +346,11 @@ void calc_daq_values_and_store(){
     //normalize the mass data
     //The math for the load cell is said to be
     //LC = Vin*25 - 12.734
+    //Since resoldering the connector, we need to subtract an additional 11.3 lbs
     //we're multiplying that by 10 because we want 0.1LBS resolution
     mass_accumulator *= 25 * 5;
     mass_accumulator /= 102; //not 1024 (arduino analog scale) because res
-    mass_accumulator -= 12;
+    mass_accumulator -= 125;
     if(mass_accumulator < 0){
         //there's a negative mass on the mass sensor
         //we set to 0 because client only accepts hexits here
